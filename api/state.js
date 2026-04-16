@@ -10,11 +10,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
     try {
       const { blobs } = await list({ prefix: BLOB_FILENAME });
       if (!blobs.length) return res.status(200).json({});
       const latest = blobs.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))[0];
-      const resp = await fetch(latest.url);
+      const resp = await fetch(latest.url + '?t=' + Date.now(), { cache: 'no-store' });
       const data = await resp.json();
       return res.status(200).json(data);
     } catch (e) {
