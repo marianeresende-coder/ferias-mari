@@ -3,39 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Atividade Mari Resende</title>
-  <script>
-    (function() {
-      const SESSION_KEY = 'ferias-mari-auth';
-      if (sessionStorage.getItem(SESSION_KEY) === 'ok') return;
-
-      document.addEventListener('DOMContentLoaded', function() {
-        const overlay = document.getElementById('auth-overlay');
-        overlay.style.display = 'flex';
-        document.getElementById('app-content').style.display = 'none';
-
-        document.getElementById('auth-form').addEventListener('submit', function(e) {
-          e.preventDefault();
-          const email = document.getElementById('auth-email').value.trim().toLowerCase();
-          const pass  = document.getElementById('auth-pass').value;
-          const err   = document.getElementById('auth-error');
-
-          if (!email.endsWith('@seazone.com.br')) {
-            err.textContent = 'Use seu e-mail @seazone.com.br';
-            err.style.display = 'block'; return;
-          }
-          if (pass !== 'Mariane2026') {
-            err.textContent = 'Senha incorreta';
-            err.style.display = 'block'; return;
-          }
-
-          sessionStorage.setItem(SESSION_KEY, 'ok');
-          overlay.style.display = 'none';
-          document.getElementById('app-content').style.display = 'block';
-        });
-      });
-    })();
-  </script>
+  <title>Férias Mari 🌴</title>
   <style>
     :root {
       --orange: #FF6B35;
@@ -91,6 +59,7 @@
       transition: color .3s;
     }
     .save-status.saved { color: var(--green); }
+    .save-status.syncing { color: var(--orange); }
     .dot {
       width: 8px; height: 8px;
       border-radius: 50%;
@@ -371,37 +340,26 @@
 </head>
 <body>
 
-<!-- ── AUTH OVERLAY ── -->
-<div id="auth-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#1A1A2E;align-items:center;justify-content:center;">
-  <div style="background:#242438;border:1px solid #3A3A55;border-radius:20px;padding:40px 36px;width:100%;max-width:380px;text-align:center;">
-    <h2 style="color:#fff;font-size:1.4rem;font-weight:800;margin-bottom:4px;">Atividade Mari Resende</h2>
-    <p style="color:#8888AA;font-size:0.85rem;margin-bottom:28px;">Acesso restrito à equipe Seazone</p>
-    <form id="auth-form" autocomplete="off">
-      <input id="auth-email" type="email" placeholder="seu@seazone.com.br" required
-        style="width:100%;padding:12px 16px;border-radius:10px;border:1px solid #3A3A55;background:#1A1A2E;color:#fff;font-size:0.9rem;margin-bottom:12px;outline:none;" />
-      <input id="auth-pass" type="password" placeholder="Senha" required
-        style="width:100%;padding:12px 16px;border-radius:10px;border:1px solid #3A3A55;background:#1A1A2E;color:#fff;font-size:0.9rem;margin-bottom:8px;outline:none;" />
-      <div id="auth-error" style="display:none;color:#ff5555;font-size:0.82rem;margin-bottom:12px;"></div>
-      <button type="submit"
-        style="width:100%;padding:13px;border-radius:10px;border:none;background:#FF6B35;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;">
-        Entrar
-      </button>
-    </form>
-  </div>
-</div>
-
-<!-- ── APP ── -->
-<div id="app-content">
-
 <header>
-  <h1>Atividade <span>Mari Resende</span></h1>
+  <h1>🌴 Férias <span>Mari</span></h1>
   <p>Clique em qualquer texto para editar · ⭐ destaca meta de abril · ✓ marca como feito</p>
   <div class="save-status" id="saveStatus">
     <span class="dot"></span> <span id="saveText">Pronto para editar</span>
   </div>
 </header>
 
+<div class="toolbar">
+  <button class="primary" onclick="saveAll()">💾 Salvar tudo</button>
+  <button onclick="expandAll()">↕ Expandir todas</button>
+  <button onclick="clearStorage()">🗑 Resetar dados</button>
+  <button onclick="window.print()">🖨 Imprimir</button>
+</div>
 
+<div class="legend">
+  <span><span class="badge-meta">⭐ META ABR</span> Impacta meta de abril</span>
+  <span><span class="badge-done">✓ feito</span> Concluído</span>
+  <span>· Clique no texto para editar · Enter = nova linha</span>
+</div>
 
 <div class="grid" id="grid"></div>
 
@@ -505,19 +463,6 @@ const SECTIONS = [
     ]
   },
   {
-    id: 'ia-coordinator',
-    color: 'c-purple',
-    icon: '🎯',
-    title: 'IA Coordinator',
-    tag: 'Coordinator',
-    items: [
-      { text: 'Status geral da coordenação de IAs', meta: false, done: false },
-      { text: 'Pendências entre times / agentes', meta: false, done: false },
-      { text: 'Próximas entregas coordenadas', meta: false, done: false },
-      { text: 'Alinhamentos e decisões abertas', meta: false, done: false },
-    ]
-  },
-  {
     id: 'vistas-anita',
     color: 'c-red',
     icon: '🌅',
@@ -534,21 +479,62 @@ const SECTIONS = [
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let state = {};
+let isSyncing = false;
 
-function loadState() {
+async function loadState() {
+  setSaveStatus('syncing', '☁️ Carregando...');
+  try {
+    const resp = await fetch('/api/state');
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && Object.keys(data).length > 0) {
+        state = data;
+        setSaveStatus('saved', 'Sincronizado ✓');
+        setTimeout(() => setSaveStatus('idle', 'Pronto para editar'), 2000);
+        return;
+      }
+    }
+  } catch(e) {}
+  // fallback to localStorage
   try {
     const raw = localStorage.getItem('ferias-mari-v2');
     if (raw) state = JSON.parse(raw);
   } catch(e) {}
+  setSaveStatus('idle', 'Pronto para editar');
 }
 
-function saveState() {
-  localStorage.setItem('ferias-mari-v2', JSON.stringify(state));
+function setSaveStatus(type, text) {
   const el = document.getElementById('saveStatus');
   const txt = document.getElementById('saveText');
-  el.classList.add('saved');
-  txt.textContent = 'Salvo ✓ ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
-  setTimeout(() => { el.classList.remove('saved'); txt.textContent = 'Pronto para editar'; }, 2500);
+  el.classList.remove('saved', 'syncing');
+  if (type === 'saved') el.classList.add('saved');
+  if (type === 'syncing') el.classList.add('syncing');
+  txt.textContent = text;
+}
+
+async function saveState() {
+  // always save to localStorage as cache
+  localStorage.setItem('ferias-mari-v2', JSON.stringify(state));
+  if (isSyncing) return;
+  isSyncing = true;
+  setSaveStatus('syncing', '☁️ Salvando...');
+  try {
+    const resp = await fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    });
+    if (resp.ok) {
+      setSaveStatus('saved', 'Salvo na nuvem ✓ ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}));
+      setTimeout(() => setSaveStatus('idle', 'Pronto para editar'), 2500);
+    } else {
+      setSaveStatus('idle', 'Salvo localmente');
+    }
+  } catch(e) {
+    setSaveStatus('idle', 'Salvo localmente');
+  } finally {
+    isSyncing = false;
+  }
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -749,19 +735,24 @@ function expandAll() {
   renderAll();
 }
 
-function clearStorage() {
-  if (!confirm('Resetar todos os dados? Isso apaga tudo que você editou.')) return;
+async function clearStorage() {
+  if (!confirm('Resetar todos os dados para todos? Isso apaga tudo na nuvem.')) return;
   localStorage.removeItem('ferias-mari-v2');
   state = {};
   renderAll();
+  await fetch('/api/state', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-loadState();
-// Pre-load all sections so they show immediately
-SECTIONS.forEach(sec => getSection(sec.id));
-renderAll();
+(async () => {
+  await loadState();
+  SECTIONS.forEach(sec => getSection(sec.id));
+  renderAll();
+})();
 </script>
-</div><!-- /app-content -->
 </body>
 </html>
