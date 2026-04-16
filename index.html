@@ -575,6 +575,7 @@ const SECTIONS = [
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let state = {};
 let isSyncing = false;
+let isLocalEditor = false; // true = este browser tem dados locais, nunca sobrescreve com nuvem
 
 async function loadState() {
   setSaveStatus('syncing', '☁️ Carregando...');
@@ -583,6 +584,7 @@ async function loadState() {
   try {
     const raw = localStorage.getItem('ferias-mari-v2');
     if (raw) {
+      isLocalEditor = true; // este browser é o editor — polling nunca vai sobrescrever
       state = JSON.parse(raw);
       await saveState(); // push para nuvem agora
       return;
@@ -616,6 +618,7 @@ function setSaveStatus(type, text) {
 }
 
 async function saveState() {
+  state._savedAt = Date.now(); // timestamp para detectar dados mais recentes
   localStorage.setItem('ferias-mari-v2', JSON.stringify(state));
   if (isSyncing) return;
   isSyncing = true;
@@ -947,17 +950,20 @@ window.syncAgora = async () => {
   alert('Sincronizado com a nuvem!');
 };
 
-// ── POLLING (atualiza a cada 5s se não estiver editando) ──────────────────────
+// ── POLLING (atualiza a cada 5s para visualizadores — editores NÃO são sobrescritos) ──
 let lastCloudState = null;
 setInterval(async () => {
-  if (isSyncing) return;
+  if (isSyncing || isLocalEditor) return; // editores nunca recebem sobrescrita da nuvem
   try {
     const resp = await fetch('/api/state?t=' + Date.now(), { cache: 'no-store' });
     if (!resp.ok) return;
     const data = await resp.json();
+    if (!data || Object.keys(data).length === 0) return; // ignora nuvem vazia
     const serialized = JSON.stringify(data);
     if (lastCloudState === null) { lastCloudState = serialized; return; }
     if (serialized !== lastCloudState) {
+      // só aplica se a nuvem tiver dados mais recentes do que o estado local
+      if ((data._savedAt || 0) <= (state._savedAt || 0)) return;
       lastCloudState = serialized;
       state = data;
       SECTIONS.forEach(sec => getSection(sec.id));
