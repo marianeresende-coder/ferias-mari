@@ -578,8 +578,20 @@ let isSyncing = false;
 
 async function loadState() {
   setSaveStatus('syncing', '☁️ Carregando...');
+
+  // Se tem dados locais, eles têm prioridade — sobe pra nuvem imediatamente
   try {
-    const resp = await fetch('/api/state');
+    const raw = localStorage.getItem('ferias-mari-v2');
+    if (raw) {
+      state = JSON.parse(raw);
+      await saveState(); // push para nuvem agora
+      return;
+    }
+  } catch(e) {}
+
+  // Sem dados locais: busca da nuvem (outros dispositivos / visitantes)
+  try {
+    const resp = await fetch('/api/state?t=' + Date.now(), { cache: 'no-store' });
     if (resp.ok) {
       const data = await resp.json();
       if (data && Object.keys(data).length > 0) {
@@ -590,15 +602,7 @@ async function loadState() {
       }
     }
   } catch(e) {}
-  try {
-    const raw = localStorage.getItem('ferias-mari-v2');
-    if (raw) {
-      state = JSON.parse(raw);
-      // push local data to cloud so others can see it
-      await saveState();
-      return;
-    }
-  } catch(e) {}
+
   setSaveStatus('idle', 'Pronto para editar');
 }
 
