@@ -461,7 +461,7 @@
   <div class="notes-box" id="generalNotes" contenteditable="true" spellcheck="false"></div>
 </div>
 
-<button class="sync-btn" onclick="saveAll()">☁️ Sincronizar agora</button>
+<button class="sync-btn" onclick="syncAgora()">☁️ Sincronizar agora</button>
 
 <script>
 // ── DATA ──────────────────────────────────────────────────────────────────────
@@ -936,6 +936,16 @@ document.getElementById('modalNotes').addEventListener('input', () => {
   SECTIONS.forEach(sec => getSection(sec.id));
   renderAll();
 })();
+
+// botão sync visível via console também
+window.syncAgora = async () => {
+  const raw = localStorage.getItem('ferias-mari-v2');
+  if (!raw) { alert('Sem dados locais para sincronizar.'); return; }
+  state = JSON.parse(raw);
+  isSyncing = false;
+  await saveState();
+  alert('Sincronizado com a nuvem!');
+};
 
 // ── POLLING (atualiza a cada 5s se não estiver editando) ──────────────────────
 let lastCloudState = null;
