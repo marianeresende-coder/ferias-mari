@@ -254,6 +254,21 @@
       color: #fff;
     }
 
+    .drag-handle {
+      width: 16px;
+      flex-shrink: 0;
+      cursor: grab;
+      color: var(--border);
+      font-size: .85rem;
+      margin-top: 1px;
+      user-select: none;
+      transition: color .15s;
+    }
+    .item:hover .drag-handle { color: var(--muted); }
+    .drag-handle:active { cursor: grabbing; }
+    .item.dragging { opacity: .4; }
+    .item.drag-over { border-top: 2px solid var(--orange); }
+
     .item-text {
       flex: 1;
       font-size: 0.88rem;
@@ -686,10 +701,51 @@ function buildCard(sec) {
   return card;
 }
 
+const PRIORITY_LABELS = ['🥇', '🥈', '🥉'];
+
 function buildItem(secId, idx, item) {
   const li = document.createElement('li');
   li.className = 'item' + (item.meta ? ' meta' : '') + (item.done ? ' done' : '');
   li.dataset.idx = idx;
+  li.draggable = true;
+
+  // drag handle
+  const handle = document.createElement('div');
+  handle.className = 'drag-handle';
+  handle.textContent = '⠿';
+  handle.title = 'Arrastar para reordenar';
+
+  // drag events
+  li.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({ secId, idx }));
+    li.classList.add('dragging');
+  });
+  li.addEventListener('dragend', () => li.classList.remove('dragging'));
+  li.addEventListener('dragover', e => { e.preventDefault(); li.classList.add('drag-over'); });
+  li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
+  li.addEventListener('drop', e => {
+    e.preventDefault();
+    li.classList.remove('drag-over');
+    const { secId: fromSec, idx: fromIdx } = JSON.parse(e.dataTransfer.getData('text/plain'));
+    if (fromSec !== secId || fromIdx === idx) return;
+    const items = state[secId].items;
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(idx, 0, moved);
+    refreshList(secId);
+    autoSave();
+  });
+
+  // priority badge (top 3)
+  if (idx < 3) {
+    const badge = document.createElement('span');
+    badge.textContent = PRIORITY_LABELS[idx];
+    badge.title = `Prioridade ${idx + 1}`;
+    badge.style.cssText = 'font-size:.9rem;flex-shrink:0;margin-top:1px;';
+    li.appendChild(handle);
+    li.appendChild(badge);
+  } else {
+    li.appendChild(handle);
+  }
 
   // check
   const chk = document.createElement('div');
@@ -745,6 +801,7 @@ function buildItem(secId, idx, item) {
   } else {
     li.appendChild(chk); li.appendChild(txt); li.appendChild(acts);
   }
+  // handle já foi appendado no início (dentro do bloco de prioridade acima)
 
   return li;
 }
