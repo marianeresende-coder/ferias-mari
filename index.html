@@ -584,33 +584,17 @@ let isSyncing = false;
 let isLocalEditor = false; // true = este browser tem dados locais, nunca sobrescreve com nuvem
 
 async function loadState() {
-  setSaveStatus('syncing', '☁️ Carregando...');
-
-  // Se tem dados locais, eles têm prioridade — sobe pra nuvem imediatamente
+  // Se tem dados locais, eles têm prioridade absoluta
   try {
     const raw = localStorage.getItem('ferias-mari-v3');
     if (raw) {
-      isLocalEditor = true; // este browser é o editor — polling nunca vai sobrescrever
+      isLocalEditor = true; // editor: polling nunca sobrescreve
       state = JSON.parse(raw);
-      await saveState(); // push para nuvem agora
+      saveState(); // push pra nuvem em background (sem await)
       return;
     }
   } catch(e) {}
-
-  // Sem dados locais: busca da nuvem (outros dispositivos / visitantes)
-  try {
-    const resp = await fetch('/api/state?t=' + Date.now(), { cache: 'no-store' });
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data && Object.keys(data).length > 0) {
-        state = data;
-        setSaveStatus('saved', 'Sincronizado ✓');
-        setTimeout(() => setSaveStatus('idle', 'Pronto para editar'), 2000);
-        return;
-      }
-    }
-  } catch(e) {}
-
+  // Sem localStorage: usa os defaults hardcodados (polling vai trazer updates da nuvem)
   setSaveStatus('idle', 'Pronto para editar');
 }
 
@@ -966,10 +950,9 @@ setInterval(async () => {
     const data = await resp.json();
     if (!data || Object.keys(data).length === 0) return; // ignora nuvem vazia
     const serialized = JSON.stringify(data);
-    if (lastCloudState === null) { lastCloudState = serialized; return; }
+    // só aplica se a nuvem tiver dados mais recentes do que o estado atual
+    if ((data._savedAt || 0) <= (state._savedAt || 0)) { lastCloudState = serialized; return; }
     if (serialized !== lastCloudState) {
-      // só aplica se a nuvem tiver dados mais recentes do que o estado local
-      if ((data._savedAt || 0) <= (state._savedAt || 0)) return;
       lastCloudState = serialized;
       state = data;
       SECTIONS.forEach(sec => getSection(sec.id));
