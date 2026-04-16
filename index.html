@@ -715,7 +715,6 @@ function buildItem(secId, idx, item) {
     }
     if (e.key === 'Backspace' && txt.textContent === '') {
       e.preventDefault();
-      removeItem(secId, idx);
     }
   });
 
@@ -736,15 +735,8 @@ function buildItem(secId, idx, item) {
   notesBtn.textContent = '📝';
   notesBtn.onclick = (e) => { e.stopPropagation(); openModal(secId, idx); };
 
-  const delBtn = document.createElement('button');
-  delBtn.className = 'btn-icon del';
-  delBtn.title = 'Remover';
-  delBtn.textContent = '✕';
-  delBtn.onclick = () => removeItem(secId, idx);
-
   acts.appendChild(notesBtn);
   acts.appendChild(starBtn);
-  acts.appendChild(delBtn);
 
   if (hasNotes) {
     const dot = document.createElement('div');
