@@ -932,6 +932,27 @@ document.getElementById('modalNotes').addEventListener('input', () => {
   SECTIONS.forEach(sec => getSection(sec.id));
   renderAll();
 })();
+
+// ── POLLING (atualiza a cada 5s se não estiver editando) ──────────────────────
+let lastCloudState = null;
+setInterval(async () => {
+  if (isSyncing) return;
+  try {
+    const resp = await fetch('/api/state');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const serialized = JSON.stringify(data);
+    if (lastCloudState === null) { lastCloudState = serialized; return; }
+    if (serialized !== lastCloudState) {
+      lastCloudState = serialized;
+      state = data;
+      SECTIONS.forEach(sec => getSection(sec.id));
+      renderAll();
+      setSaveStatus('saved', 'Atualizado ✓');
+      setTimeout(() => setSaveStatus('idle', 'Pronto para editar'), 2000);
+    }
+  } catch(e) {}
+}, 5000);
 </script>
 </div><!-- /app-content -->
 </body>
